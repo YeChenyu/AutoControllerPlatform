@@ -18,8 +18,17 @@ public class Constant {
 	public static final String KEY_HOSTNAME = "HOSTNAME";
 	public static final String KEY_FILE = "FILE";
 	public static final String KEY_LENGTH = "LENGTH";
+	public static final String KEY_DATA_TYPE = "DATA_TYPE";
+	public static final String KEY_DATA = "DATA";
 
 	public static final String TYPE_PHONE = "type_phone";
 	public static final String TYPE_SCREEN = "type_screen";
+
+	public static final String FILE_PHONE = "phone.3gp";
+	public static final String FILE_SCREEN = "screen.mp4";
+
+
+
+
 
 }

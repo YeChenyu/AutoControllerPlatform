@@ -52,12 +52,19 @@ public class ServerThread extends Thread {
         	Socket socket = null;
         	try {
         		System.out.println("ServerThread: start to wait client"+ (mClientMap.size()+1)+" connect...");
-        		 socket = mServer.accept();
+        		socket = mServer.accept();
         	}catch(IOException e) {
         		errMessage = e.getMessage();
         	}finally {
                 if (socket == null) {
                     System.out.println("ServerThread: connected fail "+ errMessage);
+					for(String key : mClientMap.keySet()){
+						ConnectionThread thread = mClientMap.get(key);
+						if(!thread.isDataConnected()){
+							System.out.println("ServerThread: remove foreach client "+ key);
+							mClientMap.remove(key);
+						}
+					}
                     try {
 						Thread.sleep(3*1000);
 					} catch (InterruptedException e1) {
@@ -89,13 +96,6 @@ public class ServerThread extends Thread {
 							}
 						}
 	                });
-	                for(String key : mClientMap.keySet()){
-	                	ConnectionThread thread = mClientMap.get(key);
-	                	if(!thread.isConnected() || !thread.isAlive()){
-							System.out.println("ServerThread: remove foreach client "+ key);
-	                		mClientMap.remove(key);
-						}
-					}
 	                String key = address.toString();
 	                mClientMap.put(key, mConnection);
 	                mConnection.start();

@@ -1,12 +1,6 @@
 package com.yecy.surveyplatform.test;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
@@ -17,6 +11,7 @@ import java.util.Set;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONException;
 import com.alibaba.fastjson.JSONObject;
+import org.springframework.boot.system.ApplicationHome;
 
 
 /**
@@ -39,11 +34,15 @@ public class ConnectionThread extends Thread {
     private String hostname;
     private OnConnectionListener mListener;
     private boolean isRunning = false;
+    private String javaHome;
 
     public ConnectionThread(Socket socket, OnConnectionListener listener) {
     	this.socket = socket;
     	mListener = listener;
     	hostname = socket.getRemoteSocketAddress().toString();
+		ApplicationHome home = new ApplicationHome(getClass());
+    	javaHome = home.getSource().getParentFile().getAbsolutePath().toString();
+		System.out.println("Server home path="+ javaHome);
     }
 
     @Override
@@ -149,7 +148,7 @@ public class ConnectionThread extends Thread {
 					job.addAll(clients);
 					json = new JSONObject();
 					json.put(Constant.KEY_LIST, job.toString());
-					byte[] result = json.toString().getBytes();
+					byte[] result = (json.toString()+"\n").getBytes();
 					writeData(result, result.length);
 					job = null;
 					json = null;
@@ -157,26 +156,31 @@ public class ConnectionThread extends Thread {
 				 * 进行远程设备操作
 				 */
 				}else if(cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_DEVICE)){
-					String hostname = json.getString(Constant.KEY_HOSTNAME);
-					if(hostname != null){
-						if(!isFileExist(hostname)){
+					String host = json.getString(Constant.KEY_HOSTNAME);
+					System.out.println("hostname="+ host);
+					if(host != null){
+						if(!isFileExist(host)){
 							Set<String> keys = ServerThread.mClientMap.keySet();
-							if(keys.contains(hostname)){
-								ConnectionThread thread = ServerThread.mClientMap.get(hostname);
+							if(keys.contains(host)){
+								ConnectionThread thread = ServerThread.mClientMap.get(host);
 								if(thread != null){
-									byte[] jsonData = data.getBytes();
+									byte[] jsonData = (data+"\n").getBytes();
 									thread.writeData(jsonData, jsonData.length);
 								}else{
 									//未找到目标终端，错误处理
+									System.out.println("Client"+ host+ " is no fond");
 								}
 							}else{
 								//未找到目标终端，错误处理
+								System.out.println("Client"+ host+ " is no fond");
 							}
 						}else{
 							//本地文件已存在，直接返回
+							returnFileToClient(hostname);
 						}
 					}else{
 						//参数错误，错误处理
+						System.out.println("target host is not fond");
 					}
 				/**
 				 * 转发远程信息
@@ -186,15 +190,16 @@ public class ConnectionThread extends Thread {
 					long length = json.getLong(Constant.KEY_LENGTH);
 					String main = json.getString(Constant.KEY_HOSTNAME);
 					System.out.println("Client"+ hostname+ " message to "+ main+ " filename="+ fileName+ ", length="+ length);
-					String result = null;
 					ConnectionThread thread = ServerThread.mClientMap.get(main);
-					byte[] head = data.getBytes();
+					byte[] head = (data+"\n").getBytes();
 					thread.writeData(head, head.length);
+
 					if(thread != null){
 						try {
-							while ((result = br.readLine()) != null) {
-								byte[] ret = result.getBytes();
-								thread.writeData(ret, ret.length);
+							int ret = -1;
+							byte[] result = new byte[1024];
+							while ((ret = is.read(result)) != -1) {
+								thread.writeData(result, ret);
 							}
 							System.out.println("Client"+ hostname+ " transfer success!");
 						}catch (IOException e){
@@ -210,10 +215,65 @@ public class ConnectionThread extends Thread {
     }
 
     private boolean isFileExist(String hostname){
-    	
+    	File phone = new File(javaHome+ "/"+ Constant.FILE_PHONE);
+    	File screen = new File(javaHome+ "/"+ Constant.FILE_SCREEN);
+    	System.out.println("file phone exist:"+ phone.exists()+ " file screen exist:"+ screen.exists());
+    	if(phone.exists() || screen.exists())
+    		return true;
     	return false;
 	}
 
+	private void returnFileToClient(String hostname){
+		System.out.println("Client"+ hostname+ " start to transfer file...");
+		ConnectionThread thread = ServerThread.mClientMap.get(hostname);
+		File root = new File(javaHome+ "/"+ Constant.FILE_PHONE);
+		FileInputStream fis = null;
+		if(root.exists()){
+			writeFileToClient(thread, root, hostname);
+		}
+		root = new File(javaHome+ "/"+ Constant.FILE_SCREEN);
+		if(root.exists()){
+			writeFileToClient(thread, root, hostname);
+		}
+	}
+
+	private void writeFileToClient(ConnectionThread thread, File root, String hostname){
+    	FileInputStream fis = null;
+		try {
+			fis = new FileInputStream(root);
+			JSONObject json = new JSONObject();
+			json.put(Constant.KEY_CMD, Constant.CMD_RETURN_REMOTE_DEVICE);
+			json.put(Constant.KEY_HOSTNAME, hostname);
+			json.put(Constant.KEY_FILE, root.getName());
+			json.put(Constant.KEY_LENGTH, root.length());
+
+			String temp = json.toString()+ "\n";
+			byte[] data = temp.getBytes();
+			thread.writeData(data, data.length);
+			Thread.sleep(100);
+
+			int result = -1;
+			byte[] recv = new byte[1024];
+			while ((result = fis.read(recv)) != -1) {
+				thread.writeData(recv, result);
+			}
+			System.out.println("Client"+ hostname+ " transfer success!");
+		}catch (IOException e){
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} finally {
+//			root.delete();
+//			root = null;
+			if(fis != null){
+				try {
+					fis.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}
 
     public void writeData(byte[] data, int length){
         if(os != null){
@@ -225,6 +285,16 @@ public class ConnectionThread extends Thread {
             }
         }
     }
+
+    public boolean isDataConnected(){
+		try {
+			socket.sendUrgentData(0xff);
+			return true;
+		} catch (IOException e) {
+			e.printStackTrace();
+			return false;
+		}
+	}
 
     public void destoryClient(){
     	if(socket != null){
