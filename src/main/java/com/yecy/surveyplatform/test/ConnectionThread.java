@@ -1,9 +1,7 @@
 package com.yecy.surveyplatform.test;
 
 import java.io.*;
-import java.net.InetAddress;
 import java.net.Socket;
-import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -31,15 +29,17 @@ public class ConnectionThread extends Thread {
     private BufferedReader br;
 
     private static final String AUTH_STRING ="1234567890";
-    private String hostname;
+    private String clientHostName;
     private OnConnectionListener mListener;
     private boolean isRunning = false;
     private String javaHome;
 
+    private String fileTransferHost;
+
     public ConnectionThread(Socket socket, OnConnectionListener listener) {
     	this.socket = socket;
     	mListener = listener;
-    	hostname = socket.getRemoteSocketAddress().toString();
+    	clientHostName = socket.getRemoteSocketAddress().toString();
 		ApplicationHome home = new ApplicationHome(getClass());
     	javaHome = home.getSource().getParentFile().getAbsolutePath().toString();
 		System.out.println("Server home path="+ javaHome);
@@ -49,10 +49,10 @@ public class ConnectionThread extends Thread {
     public void run() {
     	isRunning = true;
     	if(socket != null) {
-            System.out.println( "Client"+ hostname+ ": started...");
+            System.out.println( "Client"+ clientHostName+ ": started...");
             if(!socket.isConnected()) {
-            	System.out.println("Client"+ hostname+ ": connection status error");
-            	mListener.onConnectFailed(hostname, 0);
+            	System.out.println("Client"+ clientHostName+ ": connection status error");
+            	mListener.onConnectFailed(clientHostName, 0);
             	return;
             }
             try {
@@ -63,7 +63,7 @@ public class ConnectionThread extends Thread {
 				try {
 					socket.close();
 					socket = null;
-					mListener.onConnectFailed(hostname, 0);
+					mListener.onConnectFailed(clientHostName, 0);
 				} catch (IOException e1) {
 					e1.printStackTrace();
 				}
@@ -71,48 +71,64 @@ public class ConnectionThread extends Thread {
             }
             br = new BufferedReader(new InputStreamReader(is));
             BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(os));
-            System.out.println("Client"+ hostname+ ": start to read auth...");
+            System.out.println("Client"+ clientHostName+ ": start to read auth...");
             try {
 				String auth = br.readLine();
-				System.out.println("Client"+ hostname+ ": auth="+ auth);
+				System.out.println("Client"+ clientHostName+ ": auth="+ auth);
 				if(auth == null || !auth.equals(AUTH_STRING)){
-					System.out.println( "Client"+ hostname+ ":  auth failed!");
+					System.out.println( "Client"+ clientHostName+ ":  auth failed!");
 					br.close(); bw.close();
 					br = null; bw = null;
 					socket.close();
 					socket = null;
-					mListener.onConnectFailed(hostname, 0);
+					mListener.onConnectFailed(clientHostName, 0);
 					return;
 				}
-				System.out.println( "Client"+ hostname+ ": auth success, back data to client");
+				System.out.println( "Client"+ clientHostName+ ": auth success, back data to client");
 				bw.write(AUTH_STRING+ "\n");
 				bw.flush();
             }catch(IOException e) {
-				System.out.println( "Client"+ hostname+ ":  read auth failed "+ e.getMessage());
+				System.out.println( "Client"+ clientHostName+ ":  read auth failed "+ e.getMessage());
             }
+            System.out.println( "Client"+ clientHostName+ ": start to read data...");
+            /*
+             * start to read data...
+             * */
 	        while (isRunning) {
-	            try {
-	                System.out.println( "Client"+ hostname+ ": start to read data...");
-	                /*
-	                 * start to read data...
-	                 * */
-	                long start = System.currentTimeMillis();
-	                int timeout = 5;
-	                while (true) {
+	           //JSON`指令接收
+                while (true) {
+                	try {
 	                	String preData = br.readLine();
-	                    if(preData != null)
-	                    	parseCommand(preData);
-	                    long time = System.currentTimeMillis() - start;
-	                    if(time/1000 > timeout)
-	                    	break;
-	                }
-	            } catch (IOException e) {
-					System.out.println( "Client"+ hostname+ ": error status "+ e.getMessage());
-					try {
-						Thread.sleep(1000);
-					} catch (InterruptedException e1) {
-						e1.printStackTrace();
+	                    if(preData != null) {
+	                    	if(!parseCommand(preData)) {
+	                    		break;
+	                    	}
+	                    }
+		            } catch (IOException e) {
+						System.out.println( "Client"+ clientHostName+ ": error status "+ e.getMessage());
+						try {
+							Thread.sleep(1000);
+						} catch (InterruptedException e1) {
+							e1.printStackTrace();
+						}
 					}
+                }
+
+                //数据传输
+				try {
+					ConnectionThread thread = ServerThread.mClientMap.get(fileTransferHost);
+					int ret = -1, length = 0;
+					byte[] result = new byte[1024];
+					while ((ret = is.read(result)) != -1) {
+						thread.writeData(result, ret);
+						fileBw.write(result);
+						fileBw.flush();
+						length += ret;
+						if(length >= fileLength)
+							break;
+					}
+				}catch (IOException e){
+					e.printStackTrace();
 				}
 	        }
     	}
@@ -124,7 +140,12 @@ public class ConnectionThread extends Thread {
     	return socket.isConnected();
 	}
 
-    private void parseCommand(final String data){
+    /**
+     * 是否是可识别的指令
+     * @param data
+     * @return
+     */
+    private boolean parseCommand(final String data){
         if(data != null){
         	System.out.println("parseCommand: length="+ data.getBytes().length+ ", data="+ data);
             try {
@@ -141,6 +162,8 @@ public class ConnectionThread extends Thread {
 					if(keys!=null && keys.size() >1) {
 						System.out.println("client count is: "+ keys.size());
 						for(String key : keys) {
+							if(key.equals(clientHostName))
+								continue;
 							clients.add(key);
 						}
 					}
@@ -152,88 +175,165 @@ public class ConnectionThread extends Thread {
 					writeData(result, result.length);
 					job = null;
 					json = null;
+					return true;
+				/**
+				 * 获取服务器备份信息
+				 */
+				}else if(cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_DEVICE)){
+					String hostname = json.getString(Constant.KEY_HOSTNAME);
+					System.out.println("hostname="+ hostname);
+					if(hostname != null){
+						if(isFileExist(hostname, cmd)){
+							//本地文件已存在，直接返回
+							returnFileToClient(clientHostName, cmd);
+						}else{
+							ConnectionThread thread = ServerThread.mClientMap.get(clientHostName);
+							byte[] result = (json.toString()+ "\n").getBytes();
+							thread.writeData(result, result.length);
+						}
+					}else{
+						//参数错误，错误处理
+						System.out.println("target host is not fond");
+						ConnectionThread thread = ServerThread.mClientMap.get(clientHostName);
+						byte[] result = json.toString().getBytes();
+						thread.writeData(result, result.length);
+					}
+					return true;
 				/**
 				 * 进行远程设备操作
 				 */
-				}else if(cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_DEVICE)){
-					String host = json.getString(Constant.KEY_HOSTNAME);
-					System.out.println("hostname="+ host);
-					if(host != null){
-						if(!isFileExist(host)){
+				}else if(cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_DEVICE)
+						|| cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_PHONE)
+						|| cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_SCREEN)){
+					String hostname = json.getString(Constant.KEY_HOSTNAME);
+					System.out.println("hostname="+ hostname);
+					if(hostname != null){
+						if(!isFileExist(hostname, cmd)){
 							Set<String> keys = ServerThread.mClientMap.keySet();
-							if(keys.contains(host)){
-								ConnectionThread thread = ServerThread.mClientMap.get(host);
+							if(keys.contains(hostname)){
+								ConnectionThread thread = ServerThread.mClientMap.get(hostname);
 								if(thread != null){
-									byte[] jsonData = (data+"\n").getBytes();
+									json.put(Constant.KEY_HOSTNAME, clientHostName);
+									byte[] jsonData = (json.toString()+"\n").getBytes();
 									thread.writeData(jsonData, jsonData.length);
 								}else{
 									//未找到目标终端，错误处理
-									System.out.println("Client"+ host+ " is no fond");
+									System.out.println("Client"+ hostname+ " is no fond");
 								}
 							}else{
 								//未找到目标终端，错误处理
-								System.out.println("Client"+ host+ " is no fond");
+								System.out.println("Client"+ hostname+ " is no fond");
 							}
 						}else{
 							//本地文件已存在，直接返回
-							returnFileToClient(hostname);
+							returnFileToClient(clientHostName, cmd);
 						}
 					}else{
 						//参数错误，错误处理
 						System.out.println("target host is not fond");
 					}
+					return true;
 				/**
 				 * 转发远程信息
 				 */
 				}else if(cmd.equalsIgnoreCase(Constant.CMD_RETURN_REMOTE_DEVICE)){
 					String fileName = json.getString(Constant.KEY_FILE);
-					long length = json.getLong(Constant.KEY_LENGTH);
-					String main = json.getString(Constant.KEY_HOSTNAME);
-					System.out.println("Client"+ hostname+ " message to "+ main+ " filename="+ fileName+ ", length="+ length);
-					ConnectionThread thread = ServerThread.mClientMap.get(main);
+					fileLength = json.getLong(Constant.KEY_LENGTH);
+					fileTransferHost = json.getString(Constant.KEY_HOSTNAME);
+					System.out.println("Client"+ clientHostName+ " message to "+ fileTransferHost+ " filename="+ fileName+ ", length="+ fileLength);
+					ConnectionThread thread = ServerThread.mClientMap.get(fileTransferHost);
 					byte[] head = (data+"\n").getBytes();
 					thread.writeData(head, head.length);
 
-					if(thread != null){
-						try {
-							int ret = -1;
-							byte[] result = new byte[1024];
-							while ((ret = is.read(result)) != -1) {
-								thread.writeData(result, ret);
+					fileBw = createFile(fileName);
+					return false;
+				/**
+				 * 停止远程操作
+				 */
+				}else if(cmd.equalsIgnoreCase(Constant.CMD_STOP_REMOTE_OPERA)
+						|| cmd.equalsIgnoreCase(Constant.CMD_STOP_REMOTE_PHONE)
+						|| cmd.equalsIgnoreCase(Constant.CMD_STOP_REMOTE_SCREEN)) {
+					String hostname = json.getString(Constant.KEY_HOSTNAME);
+					System.out.println("hostname="+ hostname);
+					if(hostname != null){
+						Set<String> keys = ServerThread.mClientMap.keySet();
+						if(keys.contains(hostname)){
+							ConnectionThread thread = ServerThread.mClientMap.get(hostname);
+							if(thread != null){
+								byte[] jsonData = (data+"\n").getBytes();
+								thread.writeData(jsonData, jsonData.length);
+							}else{
+								//未找到目标终端，错误处理
+								System.out.println("Client"+ hostname+ " is no fond");
 							}
-							System.out.println("Client"+ hostname+ " transfer success!");
-						}catch (IOException e){
-							e.printStackTrace();
+						}else{
+							//未找到目标终端，错误处理
+							System.out.println("Client"+ hostname+ " is no fond");
 						}
+					}else{
+						//参数错误，错误处理
+						System.out.println("target host is not fond");
 					}
+					return true;
 				}
 			} catch (JSONException e) {
 				// TODO 自動生成された catch ブロック
 				e.printStackTrace();
+				return true;
 			}
         }
+        return true;
     }
 
-    private boolean isFileExist(String hostname){
+    private boolean isFileExist(String hostname, String cmd){
     	File phone = new File(javaHome+ "/"+ Constant.FILE_PHONE);
     	File screen = new File(javaHome+ "/"+ Constant.FILE_SCREEN);
     	System.out.println("file phone exist:"+ phone.exists()+ " file screen exist:"+ screen.exists());
-    	if(phone.exists() || screen.exists())
-    		return true;
+    	if(cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_DEVICE)
+			&& (phone.exists() || screen.exists())){
+				return true;
+		}
+		if(cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_PHONE) && phone.exists()){
+			return true;
+		}
+		if(cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_SCREEN) && screen.exists()){
+			return true;
+		}
     	return false;
 	}
 
-	private void returnFileToClient(String hostname){
+	private long fileLength = 0;
+	private FileOutputStream fileBw;
+	private FileOutputStream createFile(String fileName){
+		File file = new File(javaHome+ "/"+ fileName);
+		try {
+			if (!file.exists())
+				file.createNewFile();
+			return new FileOutputStream(file);
+		}catch (FileNotFoundException e){
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	private void returnFileToClient(String hostname, String cmd){
 		System.out.println("Client"+ hostname+ " start to transfer file...");
 		ConnectionThread thread = ServerThread.mClientMap.get(hostname);
-		File root = new File(javaHome+ "/"+ Constant.FILE_PHONE);
-		FileInputStream fis = null;
-		if(root.exists()){
-			writeFileToClient(thread, root, hostname);
+		File phone = new File(javaHome+ "/"+ Constant.FILE_PHONE);
+		if(cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_DEVICE)
+				|| cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_PHONE)) {
+			if (phone.exists()) {
+				writeFileToClient(thread, phone, hostname);
+			}
 		}
-		root = new File(javaHome+ "/"+ Constant.FILE_SCREEN);
-		if(root.exists()){
-			writeFileToClient(thread, root, hostname);
+		if(cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_DEVICE)
+				|| cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_PHONE)) {
+			File screen = new File(javaHome + "/" + Constant.FILE_SCREEN);
+			if (screen.exists()) {
+				writeFileToClient(thread, screen, hostname);
+			}
 		}
 	}
 
@@ -303,6 +403,13 @@ public class ConnectionThread extends Thread {
 				socket.shutdownOutput();
 				socket.close();
 				socket = null;
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		if(br != null){
+			try {
+				br.close();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}

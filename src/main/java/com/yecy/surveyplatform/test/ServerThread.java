@@ -12,7 +12,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.tomcat.jni.Address;
 
@@ -58,11 +60,13 @@ public class ServerThread extends Thread {
         	}finally {
                 if (socket == null) {
                     System.out.println("ServerThread: connected fail "+ errMessage);
-					for(String key : mClientMap.keySet()){
+                    Set<String> keySet = mClientMap.keySet();
+					for(String key : keySet){
 						ConnectionThread thread = mClientMap.get(key);
 						if(!thread.isDataConnected()){
 							System.out.println("ServerThread: remove foreach client "+ key);
-							mClientMap.remove(key);
+							thread.destoryClient();
+							mClientMap.remove(key, thread);
 						}
 					}
                     try {
@@ -87,12 +91,12 @@ public class ServerThread extends Thread {
 							// TODO 自動生成されたメソッド・スタブ
 							ConnectionThread thread = mClientMap.get(hostname);
 							if(thread != null) {
-								thread.interrupt();
-								thread = null;
 								if(mClientMap.containsKey(hostname)) {
 									System.out.println("ServerThread: remove client "+ hostname);
-									mClientMap.remove(hostname);
+									mClientMap.remove(hostname, thread);
 								}
+								thread.interrupt();
+								thread = null;
 							}
 						}
 	                });
