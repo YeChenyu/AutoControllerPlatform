@@ -1,22 +1,14 @@
 package com.yecy.surveyplatform.test;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
-
-import org.apache.tomcat.jni.Address;
 
 /**
  * @author: yechenyu
@@ -26,8 +18,6 @@ import org.apache.tomcat.jni.Address;
  * @descripe:
  **/
 public class ServerThread extends Thread {
-
-    private static final String TAG = ServerThread.class.getSimpleName();
 
     public static final String SERVER_IP = "101.133.174.68";
     public static final int SERVER_PORT = 8080;
@@ -53,20 +43,23 @@ public class ServerThread extends Thread {
         while (true) {
         	Socket socket = null;
         	try {
-        		System.out.println("ServerThread: start to wait client"+ (mClientMap.size()+1)+" connect...");
+        		System.out.println("start to wait client"+ (mClientMap.size()+1)+" connect...");
         		socket = mServer.accept();
         	}catch(IOException e) {
         		errMessage = e.getMessage();
         	}finally {
                 if (socket == null) {
                     System.out.println("ServerThread: connected fail "+ errMessage);
-                    Set<String> keySet = mClientMap.keySet();
-					for(String key : keySet){
-						ConnectionThread thread = mClientMap.get(key);
+                    Set<Entry<String, ConnectionThread>> entrySets = mClientMap.entrySet();
+
+                    Iterator<Entry<String, ConnectionThread>> iterator = entrySets.iterator();
+					while(iterator.hasNext()){
+						Entry<String, ConnectionThread> entry = iterator.next();
+						ConnectionThread thread = entry.getValue();
 						if(!thread.isDataConnected()){
-							System.out.println("ServerThread: remove foreach client "+ key);
+							System.out.println("ServerThread: remove foreach client "+ entry.getKey());
 							thread.destoryClient();
-							mClientMap.remove(key, thread);
+							iterator.remove();
 						}
 					}
                     try {
@@ -93,6 +86,7 @@ public class ServerThread extends Thread {
 							if(thread != null) {
 								if(mClientMap.containsKey(hostname)) {
 									System.out.println("ServerThread: remove client "+ hostname);
+									thread.destoryClient();
 									mClientMap.remove(hostname, thread);
 								}
 								thread.interrupt();

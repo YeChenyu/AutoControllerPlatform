@@ -21,8 +21,6 @@ import org.springframework.boot.system.ApplicationHome;
  **/
 public class ConnectionThread extends Thread {
 
-    private static final String TAG = ConnectionThread.class.getSimpleName();
-
     private Socket socket;
     private InputStream is;
     private OutputStream os;
@@ -96,7 +94,7 @@ public class ConnectionThread extends Thread {
              * */
 	        while (isRunning) {
 	           //JSON`指令接收
-                while (true) {
+                while (isRunning) {
                 	try {
 	                	String preData = br.readLine();
 	                    if(preData != null) {
@@ -177,6 +175,23 @@ public class ConnectionThread extends Thread {
 					json = null;
 					return true;
 				/**
+				 * 获取远程设备位置信息
+				 */
+				}else if(cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_LOCATION)) {
+					String host = json.getString(Constant.KEY_HOSTNAME);
+					System.out.println("Client"+ clientHostName+ " message to "+ host);
+					json.put(Constant.KEY_HOSTNAME, clientHostName);
+					if(ServerThread.mClientMap.containsKey(host)){
+						byte[] result = (json.toString() + "\n").getBytes();
+						ConnectionThread thread = ServerThread.mClientMap.get(host);
+						thread.writeData(result, result.length);
+					}else{
+						System.out.println("Client"+ host+ " cat't find out");
+						byte[] result = (json.toString()+ "\n").getBytes();
+						writeData(result, result.length);
+					}
+					return true;
+				/**
 				 * 获取服务器备份信息
 				 */
 				}else if(cmd.equalsIgnoreCase(Constant.CMD_FETCH_REMOTE_DEVICE)){
@@ -209,8 +224,7 @@ public class ConnectionThread extends Thread {
 					System.out.println("hostname="+ hostname);
 					if(hostname != null){
 						if(!isFileExist(hostname, cmd)){
-							Set<String> keys = ServerThread.mClientMap.keySet();
-							if(keys.contains(hostname)){
+							if(ServerThread.mClientMap.containsKey(hostname)){
 								ConnectionThread thread = ServerThread.mClientMap.get(hostname);
 								if(thread != null){
 									json.put(Constant.KEY_HOSTNAME, clientHostName);
@@ -223,6 +237,9 @@ public class ConnectionThread extends Thread {
 							}else{
 								//未找到目标终端，错误处理
 								System.out.println("Client"+ hostname+ " is no fond");
+								ConnectionThread thread = ServerThread.mClientMap.get(clientHostName);
+								byte[] result = json.toString().getBytes();
+								thread.writeData(result, result.length);
 							}
 						}else{
 							//本地文件已存在，直接返回
@@ -231,10 +248,13 @@ public class ConnectionThread extends Thread {
 					}else{
 						//参数错误，错误处理
 						System.out.println("target host is not fond");
+						ConnectionThread thread = ServerThread.mClientMap.get(clientHostName);
+						byte[] result = json.toString().getBytes();
+						thread.writeData(result, result.length);
 					}
 					return true;
 				/**
-				 * 转发远程信息
+				 * 转发远程文件
 				 */
 				}else if(cmd.equalsIgnoreCase(Constant.CMD_RETURN_REMOTE_DEVICE)){
 					String fileName = json.getString(Constant.KEY_FILE);
@@ -248,6 +268,18 @@ public class ConnectionThread extends Thread {
 					fileBw = createFile(fileName);
 					return false;
 				/**
+				 * 转发远程JSON 数据
+				 */
+				}else if(cmd.equalsIgnoreCase(Constant.CMD_TRANSFER_REMOTE_DATA)){
+					String host = json.getString(Constant.KEY_HOSTNAME);
+					System.out.println("Client"+ clientHostName+ " message to "+ host);
+					json.put(Constant.KEY_HOSTNAME, clientHostName);
+					ConnectionThread thread = ServerThread.mClientMap.get(host);
+					byte[] head = (data+"\n").getBytes();
+					thread.writeData(head, head.length);
+
+					return true;
+				/**
 				 * 停止远程操作
 				 */
 				}else if(cmd.equalsIgnoreCase(Constant.CMD_STOP_REMOTE_OPERA)
@@ -256,8 +288,7 @@ public class ConnectionThread extends Thread {
 					String hostname = json.getString(Constant.KEY_HOSTNAME);
 					System.out.println("hostname="+ hostname);
 					if(hostname != null){
-						Set<String> keys = ServerThread.mClientMap.keySet();
-						if(keys.contains(hostname)){
+						if(ServerThread.mClientMap.containsKey(hostname)){
 							ConnectionThread thread = ServerThread.mClientMap.get(hostname);
 							if(thread != null){
 								byte[] jsonData = (data+"\n").getBytes();
@@ -358,13 +389,13 @@ public class ConnectionThread extends Thread {
 				thread.writeData(recv, result);
 			}
 			System.out.println("Client"+ hostname+ " transfer success!");
+//			root.delete();
+//			root = null;
 		}catch (IOException e){
 			e.printStackTrace();
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		} finally {
-//			root.delete();
-//			root = null;
 			if(fis != null){
 				try {
 					fis.close();
@@ -397,6 +428,7 @@ public class ConnectionThread extends Thread {
 	}
 
     public void destoryClient(){
+    	isRunning = false;
     	if(socket != null){
 			try {
 				socket.shutdownInput();
