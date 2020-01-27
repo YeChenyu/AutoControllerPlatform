@@ -1,2 +1,4 @@
 
 target/surveyplatform.jar
+.idea/
+.idea/*.*

@@ -1,6 +1,6 @@
 package com.yecy.surveyplatform;
 
-import com.yecy.surveyplatform.test.ServerThread;
+import com.yecy.surveyplatform.thread.ServerThread;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 

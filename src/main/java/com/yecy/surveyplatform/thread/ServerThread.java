@@ -1,4 +1,4 @@
-package com.yecy.surveyplatform.test;
+package com.yecy.surveyplatform.thread;
 
 import java.io.IOException;
 import java.net.ServerSocket;

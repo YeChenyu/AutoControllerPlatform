@@ -1,4 +1,4 @@
-package com.yecy.surveyplatform.test;
+package com.yecy.surveyplatform.thread;
 
 public interface OnConnectionListener {
 
