@@ -1,4 +1,4 @@
-package com.yecy.surveyplatform;
+package com.auto.surveyplatform;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;

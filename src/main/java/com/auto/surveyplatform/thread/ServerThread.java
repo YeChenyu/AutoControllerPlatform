@@ -1,4 +1,4 @@
-package com.yecy.surveyplatform.thread;
+package com.auto.surveyplatform.thread;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -11,9 +11,9 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 /**
- * @author: yechenyu
+ * @author: xxx
  * @create: 2020/1/5 上午9:24
- * @email: Yecynull@163.com
+ * @email: xxx.xxx.xxx
  * @version:
  * @descripe:
  **/

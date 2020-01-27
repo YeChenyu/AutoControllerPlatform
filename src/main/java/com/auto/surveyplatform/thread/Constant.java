@@ -1,4 +1,4 @@
-package com.yecy.surveyplatform.thread;
+package com.auto.surveyplatform.thread;
 
 public class Constant {
 

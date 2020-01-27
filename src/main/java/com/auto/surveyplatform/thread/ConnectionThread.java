@@ -1,4 +1,4 @@
-package com.yecy.surveyplatform.thread;
+package com.auto.surveyplatform.thread;
 
 import java.io.*;
 import java.net.Socket;
@@ -13,9 +13,9 @@ import org.springframework.boot.system.ApplicationHome;
 
 
 /**
- * @author: yechenyu
+ * @author: xxx
  * @create: 2020/1/5 上午9:24
- * @email: Yecynull@163.com
+ * @email: xxx.xxx.xxx
  * @version:
  * @descripe:
  **/

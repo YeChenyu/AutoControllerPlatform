@@ -8,10 +8,10 @@
         <version>2.1.8.RELEASE</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>com.judo.surveyplatform</groupId>
-    <artifactId>surveyplatform</artifactId>
+    <groupId>com.auto.surveyplatform</groupId>
+    <artifactId>AutoControllerPlatform</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>surveyplatform</name>
+    <name>AutoControllerPlatform</name>
     <description>Demo project for Spring Boot</description>
 
     <properties>
@@ -42,7 +42,7 @@
 
     </dependencies>
     <build>
-        <finalName>surveyplatform</finalName>
+        <finalName>AutoControllerPlatform</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
