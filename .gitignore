@@ -1,4 +1,7 @@
 
-target/surveyplatform.jar
+./target
 .idea/
 .idea/*.*
+*.class
+./target/*.*
+*.3gp

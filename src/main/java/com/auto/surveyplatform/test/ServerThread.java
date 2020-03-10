@@ -1,4 +1,4 @@
-package com.auto.surveyplatform.thread;
+package com.auto.surveyplatform.test;
 
 import java.io.IOException;
 import java.net.ServerSocket;

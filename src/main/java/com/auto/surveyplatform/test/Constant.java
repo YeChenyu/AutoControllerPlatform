@@ -1,4 +1,4 @@
-package com.auto.surveyplatform.thread;
+package com.auto.surveyplatform.test;
 
 public class Constant {
 
@@ -7,6 +7,7 @@ public class Constant {
 	public static final int SERVER_PORT = 8080;
 	public static final int SERVER_CONNECT_TIMEOUT = 30*1000;
 
+	public static final String CMD_UNKNOWN   = "FFFFFF";
 	public static final String CMD_SEARCH_REMOTE_LIST   = "100000";
 	public static final String CMD_FETCH_REMOTE_DEVICE  = "100001";
 	public static final String CMD_RETURN_REMOTE_DEVICE  = "100002";

@@ -1,8 +1,9 @@
 package com.auto.surveyplatform;
 
-import com.auto.surveyplatform.thread.ServerThread;
+import com.auto.surveyplatform.test.ServerThread;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.system.ApplicationHome;
 
 @SpringBootApplication
 public class SurveyPlatformApplication {
