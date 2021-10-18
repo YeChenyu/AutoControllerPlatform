@@ -164,6 +164,7 @@ public class ConnectionThread extends Thread {
 		            } catch (IOException e) {
 						System.out.println( "Client"+ clientHostName+ ":"+ e.getMessage());
 						try {
+							if(!isRunning) break;
 							Thread.sleep(1000);
 						} catch (InterruptedException e1) {
 							e1.printStackTrace();
@@ -174,16 +175,21 @@ public class ConnectionThread extends Thread {
                 //数据传输
 				try {
 					ConnectionThread thread = ServerThread.mClientMap.get(fileTransferHost);
-					int ret = -1, length = 0;
-					byte[] result = new byte[1024];
-					while ((ret = is.read(result)) != -1) {
-						thread.writeData(result, ret);
-						fileBw.write(result);
+					int length = 0;
+					String result = null;
+					while ((result = br.readLine()) != null) {
+//						thread.writeData(result, ret);
+						byte[] data = StringUtil.hexStr2Bytes(result);
+						System.out.println( "write "+ data.length+ " :"+ result);
+						fileBw.write(data);
 						fileBw.flush();
-						length += ret;
+						length += data.length;
 						if(length >= fileLength)
 							break;
+						if(!isRunning)
+							break;
 					}
+					System.out.println("Transfer "+ length+ " success!");
 				}catch (IOException e){
 					e.printStackTrace();
 				}
@@ -277,7 +283,8 @@ public class ConnectionThread extends Thread {
 					String hostname = json.getString(Constant.KEY_HOSTNAME);
 					System.out.println("hostname="+ hostname);
 					if(hostname != null){
-						if(!isFileExist(hostname, cmd)){
+//						if(!isFileExist(hostname, cmd)){
+						if(true){
 							if(ServerThread.mClientMap.containsKey(hostname)){
 								ConnectionThread thread = ServerThread.mClientMap.get(hostname);
 								if(thread != null){
@@ -314,12 +321,12 @@ public class ConnectionThread extends Thread {
 					String fileName = json.getString(Constant.KEY_FILE);
 					fileLength = json.getLong(Constant.KEY_LENGTH);
 					fileTransferHost = json.getString(Constant.KEY_HOSTNAME);
-					System.out.println("Client"+ clientHostName+ " message to "+ fileTransferHost+ " filename="+ fileName+ ", length="+ fileLength);
-					ConnectionThread thread = ServerThread.mClientMap.get(fileTransferHost);
-					byte[] arrData = json.toString().getBytes();
-					byte[] arrCmd = StringUtil.hexStr2Bytes(cmd);
-					byte[] temp = mHandleProtocol.packRequestProtocol(arrCmd, arrData, (byte)0x3f);
-					thread.writeData(temp, temp.length);
+//					System.out.println("Client"+ clientHostName+ " message to "+ fileTransferHost+ " filename="+ fileName+ ", length="+ fileLength);
+//					ConnectionThread thread = ServerThread.mClientMap.get(fileTransferHost);
+//					byte[] arrData = json.toString().getBytes();
+//					byte[] arrCmd = StringUtil.hexStr2Bytes(cmd);
+//					byte[] temp = mHandleProtocol.packRequestProtocol(arrCmd, arrData, (byte)0x3f);
+//					thread.writeData(temp, temp.length);
 					//被控端传送的文件
 					fileBw = createFile(clientHostName, fileName);
 					transferFile = true;
@@ -504,10 +511,13 @@ public class ConnectionThread extends Thread {
 
 			int result = -1;
 			byte[] recv = new byte[1024];
+			System.out.println("available: " + fis.available());
+			int total = 0;
 			while ((result = fis.read(recv)) != -1) {
-				thread.writeData(recv, result);
+				total += result;
+				thread.write(recv, result);
 			}
-			System.out.println("Client"+ hostname+ " transfer success!");
+			System.out.println("Client"+ hostname+ " transfer "+ total+ " success!");
 //			root.delete();
 //			root = null;
 		}catch (IOException e){
@@ -529,14 +539,26 @@ public class ConnectionThread extends Thread {
         if(bw != null){
             try {
 				bw.flush();
-				System.out.println( "write:"+ StringUtil.byte2HexStr(data));
-				bw.write(StringUtil.byte2HexStr(data)+ "\n");
+				System.out.println( "write "+ length+ " :"+ StringUtil.byte2HexStr(data, length));
+				bw.write(StringUtil.byte2HexStr(data, length)+ "\n");
 				bw.flush();
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
+
+	public void write(byte[] data, int length){
+		if(bw != null){
+			try {
+				System.out.println( "write "+ length+ " :"+ StringUtil.byte2HexStr(data, length));
+				bw.write(StringUtil.byte2HexStr(data, length)+ "\n");
+				bw.flush();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
 
     public boolean isDataConnected(){
 		try {

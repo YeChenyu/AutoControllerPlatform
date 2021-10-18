@@ -244,9 +244,21 @@ public class StringUtil {
     public static String byte2HexStr(byte[] b) {
         if (b == null)
             return "";
+        return byte2HexStr(b, b.length);
+    }
+
+    /**
+     * Bytes converted to hexadecimal strings
+     *
+     * @param b byte array
+     * @return result   Space separation between each Byte value
+     */
+    public static String byte2HexStr(byte[] b, int length) {
+        if (b == null)
+            return "";
         String stmp = "";
         StringBuilder sb = new StringBuilder("");
-        for (int n = 0; n < b.length; n++) {
+        for (int n = 0; n < length; n++) {
             stmp = Integer.toHexString(b[n] & 0xFF);
             sb.append((stmp.length() == 1) ? "0" + stmp : stmp);
             // sb.append(" ");

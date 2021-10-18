@@ -2,8 +2,7 @@ package com.auto.surveyplatform.test;
 
 public class Constant {
 
-//	    public static String SERVER_IP = "101.133.174.68";
-	public static String SERVER_IP = "192.168.11.2";
+	public static String SERVER_IP = "192.168.0.101";
 	public static final int SERVER_PORT = 8080;
 	public static final int SERVER_CONNECT_TIMEOUT = 30*1000;
 

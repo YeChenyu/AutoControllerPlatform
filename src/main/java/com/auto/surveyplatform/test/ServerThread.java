@@ -19,9 +19,9 @@ import java.util.Set;
  **/
 public class ServerThread extends Thread {
 
-    public static final String SERVER_IP = "101.133.174.68";
+    public static final String SERVER_IP = "192.168.0.101";
     public static final int SERVER_PORT = 8080;
-    public static final int SERVER_CONNECT_TIMEOUT = 15*1000;
+    public static final int SERVER_CONNECT_TIMEOUT = 60*1000;
 
     private ServerSocket mServer;
 

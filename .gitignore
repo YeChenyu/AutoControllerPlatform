@@ -1,7 +1,12 @@
 
-./target
 .idea/
 .idea/*.*
-*.class
-./target/*.*
-*.3gp
+
+target/
+target/*.*
+target/**/*.*
+target/**/*.jar.original
+
+/**/.DS_Store
+
+
