@@ -164,7 +164,10 @@ public class ConnectionThread extends Thread {
 		            } catch (IOException e) {
 						System.out.println( "Client"+ clientHostName+ ":"+ e.getMessage());
 						try {
-							if(!isRunning) break;
+							if(e.getMessage().contains("Connection reset"))
+								break;
+							if(!isRunning)
+								break;
 							Thread.sleep(1000);
 						} catch (InterruptedException e1) {
 							e1.printStackTrace();
@@ -191,7 +194,8 @@ public class ConnectionThread extends Thread {
 					}
 					System.out.println("Transfer "+ length+ " success!");
 				}catch (IOException e){
-					e.printStackTrace();
+					if(e.getMessage().contains("Connection reset"))
+						break;
 				}
 	        }
     	}
@@ -379,6 +383,8 @@ public class ConnectionThread extends Thread {
 						return json.toString().getBytes();
 					}
 					return null;
+				}else if(cmd.equalsIgnoreCase(Constant.CMD_HEART_TEST)){
+					return json.toJSONString().getBytes();
 				}
 			} catch (JSONException e) {
 				// TODO 自動生成された catch ブロック
